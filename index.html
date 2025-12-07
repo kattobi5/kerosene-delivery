@@ -148,6 +148,30 @@ function makeCSV(rows) {
 `;
   });
 
+  // iCloud Drive など任意フォルダに保存
+  (async () => {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "today_delivery.csv",
+        types: [{
+          description: "CSV File",
+          accept: { "text/csv": [".csv"] }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(new Blob([csv], { type: "text/csv" }));
+      await writable.close();
+      alert("ファイルを保存しました（iCloud Drive も選択可能）");
+    } catch (e) {
+      console.error(e);
+      alert("保存がキャンセルされました");
+    }
+  })();
+}
+`;
+  });
+
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
