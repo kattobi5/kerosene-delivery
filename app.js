@@ -396,12 +396,20 @@ function calculateTankTotal(idx) {
     calcDiv.classList.remove('show');
     return;
   }
+  // 前の入力済みタンクのメーター値を探す（空欄タンクをスキップ）
   let prevMeterValue = 0;
   if (idx > 0) {
-    const prevInput = document.getElementById(`tankQty_${idx - 1}`);
-    prevMeterValue = Number(prevInput.value) || 0;
-    if (meterValue < prevMeterValue) {
-      alert(`⚠️ メーター値が前のタンク（${prevMeterValue}L）より小さいです\n\n累積値を入力してください`);
+    // 現在のタンクより前を逆順に探す
+    for (let i = idx - 1; i >= 0; i--) {
+      const prevInput = document.getElementById(`tankQty_${i}`);
+      const prevValue = Number(prevInput.value);
+      if (prevValue > 0) {
+        prevMeterValue = prevValue;
+        break;
+      }
+    }
+    // 入力中は警告を出さず、前の値より小さい場合は計算結果を非表示にするだけ
+    if (meterValue > 0 && meterValue < prevMeterValue) {
       calcDiv.classList.remove('show');
       return;
     }
@@ -648,6 +656,46 @@ function saveRecord() {
       const idB = parseInt(b.tankId, 10);
       return idA - idB;
     });
+  
+  // 保存前の検証: メーター値の整合性チェック
+  const errors = [];
+  for (let idx = 0; idx < custTanks.length; idx++) {
+    const qtyInput = document.getElementById(`tankQty_${idx}`);
+    const meterValue = Number(qtyInput.value);
+    
+    if (!meterValue || meterValue <= 0) continue; // 空欄はOK
+    
+    // 前の入力済みタンクのメーター値を探す
+    let prevMeterValue = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+      const prevInput = document.getElementById(`tankQty_${i}`);
+      const prevValue = Number(prevInput.value);
+      if (prevValue > 0) {
+        prevMeterValue = prevValue;
+        break;
+      }
+    }
+    
+    // 前のタンクより小さい値はエラー
+    if (prevMeterValue > 0 && meterValue < prevMeterValue) {
+      errors.push({
+        tankName: custTanks[idx].tankName,
+        meterValue: meterValue,
+        prevMeterValue: prevMeterValue
+      });
+    }
+  }
+  
+  // エラーがあれば保存を中止
+  if (errors.length > 0) {
+    const errorMessages = errors.map(e => 
+      `・${e.tankName}: ${e.meterValue}L（前のタンク: ${e.prevMeterValue}L）`
+    ).join('\n');
+    
+    alert(`⚠️ 入力エラー\n\n以下のタンクのメーター値が前のタンクより小さいです。\n\n${errorMessages}\n\n累積値を正しく入力してください。`);
+    return;
+  }
+  
   const recordsToSave = [];
 
   custTanks.forEach((t, idx) => {
@@ -656,11 +704,18 @@ function saveRecord() {
     
     if (!meterValue || meterValue <= 0) return;
 
-    // 前のタンクのメーター値を取得
+    // 前の入力済みタンクのメーター値を探す（空欄タンクをスキップ）
     let prevMeterValue = 0;
     if (idx > 0) {
-      const prevInput = document.getElementById(`tankQty_${idx - 1}`);
-      prevMeterValue = Number(prevInput.value) || 0;
+      // 現在のタンクより前を逆順に探す
+      for (let i = idx - 1; i >= 0; i--) {
+        const prevInput = document.getElementById(`tankQty_${i}`);
+        const prevValue = Number(prevInput.value);
+        if (prevValue > 0) {
+          prevMeterValue = prevValue;
+          break;
+        }
+      }
     }
     
     // 実際の給油量を計算
@@ -797,7 +852,7 @@ async function makeCSV(rows) {
       const writable = await handle.createWritable();
       await writable.write(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
       await writable.close();
-      alert(`✅ ${filename} を保存しました\n\n${rows.length}件のデータを出力しました`);
+      // ファイル保存成功（メッセージなし）
     } else {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -808,7 +863,7 @@ async function makeCSV(rows) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      alert(`✅ ${filename} をダウンロードしました\n\n${rows.length}件のデータを出力しました\n\n💡 共有シートからiCloud Driveに保存できます`);
+      // ダウンロード成功（メッセージなし）
     }
     
     markAsExported(rows);
