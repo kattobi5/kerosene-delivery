@@ -7,7 +7,7 @@
 //------------------------------------------------------------
 const CONFIG = {
   DB_NAME: "oilDB",
-  DB_VERSION: 3,
+  DB_VERSION: 4,
   DATA_RETENTION_DAYS: 30,  // データ保持期間（日数）
   AUTO_FOCUS_DELAY: 300     // 自動フォーカスの遅延（ms）
 };
@@ -174,26 +174,40 @@ function loadMastersFromDB() {
 function displayMasterImportDate() {
   if (!db) return;
   
-  const tx = db.transaction(["metadata"], "readonly");
-  const store = tx.objectStore("metadata");
-  const req = store.get("masterImportDate");
+  // metadataストアの存在確認
+  if (!db.objectStoreNames.contains("metadata")) {
+    console.log("metadataストアがまだ作成されていません");
+    return;
+  }
   
-  req.onsuccess = (e) => {
-    const data = e.target.result;
-    if (data && data.value) {
-      const date = new Date(data.value);
-      const dateStr = date.toLocaleString('ja-JP');
-      
-      // データ管理セクションに表示
-      const infoMsg = document.querySelector('.info-message');
-      if (infoMsg) {
-        infoMsg.innerHTML = `
-          💡 <strong>マスタ更新時</strong>：顧客・タンク情報が変更された場合はJSON取り込みで更新してください<br>
-          📅 <strong>最終取り込み</strong>：${dateStr}
-        `;
+  try {
+    const tx = db.transaction(["metadata"], "readonly");
+    const store = tx.objectStore("metadata");
+    const req = store.get("masterImportDate");
+    
+    req.onsuccess = (e) => {
+      const data = e.target.result;
+      if (data && data.value) {
+        const date = new Date(data.value);
+        const dateStr = date.toLocaleString('ja-JP');
+        
+        // データ管理セクションに表示
+        const infoMsg = document.querySelector('.info-message');
+        if (infoMsg) {
+          infoMsg.innerHTML = `
+            💡 <strong>マスタ更新時</strong>：顧客・タンク情報が変更された場合はJSON取り込みで更新してください<br>
+            📅 <strong>最終取り込み</strong>：${dateStr}
+          `;
+        }
       }
-    }
-  };
+    };
+    
+    req.onerror = (e) => {
+      console.error("最終取り込み日の読み込みエラー:", e);
+    };
+  } catch (error) {
+    console.error("displayMasterImportDateエラー:", error);
+  }
 }
 
 //------------------------------------------------------------
@@ -463,28 +477,39 @@ function importJSON() {
     }
 
     // DBに保存
-    if (customersData) {
-      await saveCustomersToDB(customersData);
-    }
-    
-    if (tanksData) {
-      await saveTanksToDB(tanksData);
-    }
+    try {
+      if (customersData) {
+        console.log("顧客データをDBに保存開始...");
+        await saveCustomersToDB(customersData);
+        console.log("顧客データ保存完了");
+      }
+      
+      if (tanksData) {
+        console.log("タンクデータをDBに保存開始...");
+        await saveTanksToDB(tanksData);
+        console.log("タンクデータ保存完了");
+      }
 
-    // 成功時に取り込み日時を保存
-    if (customersLoaded || tanksLoaded) {
-      saveMasterImportDate();
-    }
+      // 成功時に取り込み日時を保存
+      if (customersLoaded || tanksLoaded) {
+        console.log("取り込み日時を保存...");
+        saveMasterImportDate();
+      }
 
-    // 結果通知
-    if (customersLoaded && tanksLoaded) {
-      alert(`✅ 取り込み完了！\n\n顧客マスタ: ${customersData.length}件\nタンクマスタ: ${tanksData.length}件`);
-    } else if (customersLoaded) {
-      alert(`✅ 顧客マスタを取り込みました\n\n${customersData.length}件のデータを登録しました`);
-    } else if (tanksLoaded) {
-      alert(`✅ タンクマスタを取り込みました\n\n${tanksData.length}件のデータを登録しました`);
-    } else if (errors.length === 0) {
-      alert("⚠️ 有効なJSONファイルが見つかりませんでした");
+      // 結果通知
+      console.log("結果通知を表示:", { customersLoaded, tanksLoaded });
+      if (customersLoaded && tanksLoaded) {
+        alert(`✅ 取り込み完了！\n\n顧客マスタ: ${customersData.length}件\nタンクマスタ: ${tanksData.length}件`);
+      } else if (customersLoaded) {
+        alert(`✅ 顧客マスタを取り込みました\n\n${customersData.length}件のデータを登録しました`);
+      } else if (tanksLoaded) {
+        alert(`✅ タンクマスタを取り込みました\n\n${tanksData.length}件のデータを登録しました`);
+      } else if (errors.length === 0) {
+        alert("⚠️ 有効なJSONファイルが見つかりませんでした");
+      }
+    } catch (error) {
+      console.error("JSON取り込み処理でエラー:", error);
+      showError("データ保存エラー", error.message);
     }
   };
 
@@ -499,17 +524,32 @@ function importJSON() {
 function saveMasterImportDate() {
   if (!db) return;
   
-  const tx = db.transaction(["metadata"], "readwrite");
-  const store = tx.objectStore("metadata");
+  // metadataストアの存在確認
+  if (!db.objectStoreNames.contains("metadata")) {
+    console.warn("metadataストアが存在しません。DBを再読み込みしてください。");
+    return;
+  }
   
-  store.put({
-    key: "masterImportDate",
-    value: new Date().toISOString()
-  });
-  
-  tx.oncomplete = () => {
-    displayMasterImportDate();
-  };
+  try {
+    const tx = db.transaction(["metadata"], "readwrite");
+    const store = tx.objectStore("metadata");
+    
+    store.put({
+      key: "masterImportDate",
+      value: new Date().toISOString()
+    });
+    
+    tx.oncomplete = () => {
+      console.log("最終取り込み日を保存しました");
+      displayMasterImportDate();
+    };
+    
+    tx.onerror = (e) => {
+      console.error("最終取り込み日の保存エラー:", e);
+    };
+  } catch (error) {
+    console.error("saveMasterImportDateエラー:", error);
+  }
 }
 
 //------------------------------------------------------------
