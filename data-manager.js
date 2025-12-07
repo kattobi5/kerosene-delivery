@@ -80,9 +80,47 @@ function showDataViewModal(records) {
           ">✕</button>
         </div>
         
-        <div style="color: var(--text-secondary); margin-bottom: 20px;">
-          全${records.length}件のデータ（${dates.length}日分）
+        <!-- フィルター -->
+        <div style="
+          background: var(--bg-secondary);
+          padding: 16px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+        ">
+          <div style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+          ">
+            <select id="filterExported" onchange="filterDataView()" style="
+              padding: 8px;
+              border-radius: 6px;
+              border: 2px solid var(--border-color);
+              background: var(--bg-card);
+              color: var(--text-primary);
+            ">
+              <option value="all">すべて</option>
+              <option value="unexported">⚠️ 未出力のみ</option>
+              <option value="exported">✅ 出力済のみ</option>
+            </select>
+            <input type="text" id="filterCustomer" onkeyup="filterDataView()" placeholder="🔍 顧客名で検索" style="
+              padding: 8px;
+              border-radius: 6px;
+              border: 2px solid var(--border-color);
+              background: var(--bg-card);
+              color: var(--text-primary);
+            ">
+          </div>
+          <div id="filterResult" style="
+            color: var(--text-secondary);
+            font-size: 14px;
+          ">
+            全${records.length}件のデータ（${dates.length}日分）
+          </div>
         </div>
+        
+        <div id="dataViewContent">
   `;
 
   dates.forEach(date => {
@@ -93,7 +131,7 @@ function showDataViewModal(records) {
     const exportedCount = dayRecords.filter(r => r.exported).length;
 
     html += `
-      <div style="
+      <div data-day-container style="
         background: var(--bg-secondary);
         border-radius: 8px;
         padding: 16px;
@@ -171,7 +209,7 @@ function showDataViewModal(records) {
       const statusIcon = r.exported ? '✅' : '⚠️';
       const statusColor = r.exported ? 'var(--success-color)' : 'var(--danger-color)';
       html += `
-        <tr style="border-top: 1px solid var(--border-color);">
+        <tr data-record-row data-exported="${r.exported ? 'true' : 'false'}" data-customer="${r.custName}" style="border-top: 1px solid var(--border-color);">
           <td style="padding: 8px; text-align: center; font-size: 16px;" title="${r.exported ? '出力済' : '未出力'}">${statusIcon}</td>
           <td style="padding: 8px; color: var(--text-primary);">${r.time}</td>
           <td style="padding: 8px; color: var(--text-primary);">${r.custName}</td>
@@ -190,6 +228,7 @@ function showDataViewModal(records) {
   });
 
   html += `
+        </div>
         <div style="margin-top: 20px;">
           <button onclick="closeDataViewModal()" style="background: var(--accent-color);">
             閉じる
@@ -205,6 +244,59 @@ function showDataViewModal(records) {
 function closeDataViewModal() {
   const modal = document.getElementById("dataViewModal");
   if (modal) modal.remove();
+}
+
+//------------------------------------------------------------
+// データビューのフィルタリング
+//------------------------------------------------------------
+function filterDataView() {
+  const exportedFilter = document.getElementById('filterExported').value;
+  const customerFilter = document.getElementById('filterCustomer').value.toLowerCase();
+  
+  const allDays = document.querySelectorAll('[data-day-container]');
+  let visibleCount = 0;
+  let visibleDays = 0;
+  
+  allDays.forEach(dayDiv => {
+    const rows = dayDiv.querySelectorAll('[data-record-row]');
+    let dayHasVisible = false;
+    
+    rows.forEach(row => {
+      const exported = row.dataset.exported === 'true';
+      const customerName = row.dataset.customer.toLowerCase();
+      
+      let showRow = true;
+      
+      // 出力状態フィルター
+      if (exportedFilter === 'unexported' && exported) showRow = false;
+      if (exportedFilter === 'exported' && !exported) showRow = false;
+      
+      // 顧客名フィルター
+      if (customerFilter && !customerName.includes(customerFilter)) showRow = false;
+      
+      if (showRow) {
+        row.style.display = '';
+        visibleCount++;
+        dayHasVisible = true;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+    
+    // 日付コンテナの表示制御
+    if (dayHasVisible) {
+      dayDiv.style.display = '';
+      visibleDays++;
+    } else {
+      dayDiv.style.display = 'none';
+    }
+  });
+  
+  // フィルター結果表示
+  const resultDiv = document.getElementById('filterResult');
+  if (resultDiv) {
+    resultDiv.textContent = `${visibleCount}件のデータ（${visibleDays}日分）を表示中`;
+  }
 }
 
 //------------------------------------------------------------

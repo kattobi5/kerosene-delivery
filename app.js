@@ -1,6 +1,16 @@
 //============================================================
-// 灯油配送管理システム - メインスクリプト v3.1
+// 灯油配送管理システム - メインスクリプト v3.2
 //============================================================
+
+//------------------------------------------------------------
+// 定数定義
+//------------------------------------------------------------
+const CONFIG = {
+  DB_NAME: "oilDB",
+  DB_VERSION: 3,
+  DATA_RETENTION_DAYS: 30,  // データ保持期間（日数）
+  AUTO_FOCUS_DELAY: 300     // 自動フォーカスの遅延（ms）
+};
 
 //------------------------------------------------------------
 // グローバル変数
@@ -14,7 +24,7 @@ let currentCustomer = null;
 // IndexedDB初期化
 //------------------------------------------------------------
 function initDB() {
-  const req = indexedDB.open("oilDB", 3); // バージョン3に更新
+  const req = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
 
   req.onupgradeneeded = (e) => {
     db = e.target.result;
@@ -26,7 +36,6 @@ function initDB() {
       recordStore.createIndex("date", "date", { unique: false });
       recordStore.createIndex("exported", "exported", { unique: false });
     } else if (oldVersion < 3) {
-      // バージョン3で exported フィールド追加
       const tx = e.target.transaction;
       const recordStore = tx.objectStore("records");
       if (!recordStore.indexNames.contains("exported")) {
@@ -45,34 +54,53 @@ function initDB() {
       const tankStore = db.createObjectStore("tanks", { keyPath: "tankId" });
       tankStore.createIndex("customerCode", "customerCode", { unique: false });
     }
+    
+    // メタデータ用（新規追加）
+    if (!db.objectStoreNames.contains("metadata")) {
+      db.createObjectStore("metadata", { keyPath: "key" });
+    }
   };
 
   req.onsuccess = (e) => {
     db = e.target.result;
-    console.log("IndexedDB initialized (version 3)");
+    console.log(`IndexedDB initialized (version ${CONFIG.DB_VERSION})`);
     
     // マスタをDBから読み込み
     loadMastersFromDB();
     
     // 古いデータの自動クリーンアップ
     cleanupOldData();
+    
+    // マスタ取り込み日時を表示
+    displayMasterImportDate();
   };
 
   req.onerror = (e) => {
     console.error("IndexedDB error:", e);
-    alert("データベースの初期化に失敗しました");
+    showError("データベースの初期化に失敗しました", "ブラウザの設定を確認してください");
+  };
+  
+  req.onblocked = () => {
+    showError("データベースがブロックされています", "他のタブを閉じてページを再読み込みしてください");
   };
 }
 
 //------------------------------------------------------------
-// 古いデータの自動クリーンアップ（1ヶ月以上前の出力済みデータ）
+// エラー表示（統一）
+//------------------------------------------------------------
+function showError(title, message) {
+  alert(`❌ ${title}\n\n${message}`);
+}
+
+//------------------------------------------------------------
+// 古いデータの自動クリーンアップ
 //------------------------------------------------------------
 function cleanupOldData() {
   if (!db) return;
   
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-  const cutoffDate = oneMonthAgo.toLocaleDateString('ja-JP');
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - CONFIG.DATA_RETENTION_DAYS);
+  const cutoffDateStr = cutoffDate.toLocaleDateString('ja-JP');
   
   const tx = db.transaction(["records"], "readwrite");
   const store = tx.objectStore("records");
@@ -83,18 +111,21 @@ function cleanupOldData() {
     if (cur) {
       const record = cur.value;
       
-      // 出力済み かつ 1ヶ月以上前のデータを削除
-      // exportedフィールドがない古いデータも対象外
-      if (record.exported === true && record.date < cutoffDate) {
+      // 出力済み かつ 保持期間を超えたデータを削除
+      if (record.exported === true && record.date < cutoffDateStr) {
         cur.delete();
         deletedCount++;
       }
       cur.continue();
     } else {
       if (deletedCount > 0) {
-        console.log(`古いデータをクリーンアップ: ${deletedCount}件削除`);
+        console.log(`古いデータをクリーンアップ: ${deletedCount}件削除（${CONFIG.DATA_RETENTION_DAYS}日以上前）`);
       }
     }
+  };
+  
+  tx.onerror = () => {
+    console.error("クリーンアップ失敗");
   };
 }
 
@@ -118,6 +149,10 @@ function loadMastersFromDB() {
     }
   };
   
+  customerReq.onerror = () => {
+    showError("顧客マスタの読み込みに失敗しました", "ページを再読み込みしてください");
+  };
+  
   // タンクマスタ読み込み
   const tx2 = db.transaction(["tanks"], "readonly");
   const tankStore = tx2.objectStore("tanks");
@@ -126,6 +161,38 @@ function loadMastersFromDB() {
   tankReq.onsuccess = (e) => {
     tanks = e.target.result || [];
     console.log("タンクマスタ読込:", tanks.length, "件");
+  };
+  
+  tankReq.onerror = () => {
+    showError("タンクマスタの読み込みに失敗しました", "ページを再読み込みしてください");
+  };
+}
+
+//------------------------------------------------------------
+// マスタ取り込み日時を表示
+//------------------------------------------------------------
+function displayMasterImportDate() {
+  if (!db) return;
+  
+  const tx = db.transaction(["metadata"], "readonly");
+  const store = tx.objectStore("metadata");
+  const req = store.get("masterImportDate");
+  
+  req.onsuccess = (e) => {
+    const data = e.target.result;
+    if (data && data.value) {
+      const date = new Date(data.value);
+      const dateStr = date.toLocaleString('ja-JP');
+      
+      // データ管理セクションに表示
+      const infoMsg = document.querySelector('.info-message');
+      if (infoMsg) {
+        infoMsg.innerHTML = `
+          💡 <strong>マスタ更新時</strong>：顧客・タンク情報が変更された場合はJSON取り込みで更新してください<br>
+          📅 <strong>最終取り込み</strong>：${dateStr}
+        `;
+      }
+    }
   };
 }
 
@@ -231,12 +298,14 @@ function onCustomerChange() {
         type="number" 
         id="tankQty_${idx}" 
         data-tank-idx="${idx}"
+        data-tank-capacity="${t.tankCapacity}"
         min="0" 
         max="${t.tankCapacity}"
         step="1"
         placeholder="0"
         inputmode="decimal"
         oninput="calculateTankTotal(${idx})"
+        onkeypress="handleEnterKey(event, ${idx}, ${custTanks.length})"
       >
       
       <!-- 計算結果表示 -->
@@ -265,16 +334,50 @@ function onCustomerChange() {
     `;
     container.appendChild(div);
   });
+  
+  // 1つ目のタンクに自動フォーカス
+  setTimeout(() => {
+    const firstInput = document.getElementById("tankQty_0");
+    if (firstInput) firstInput.focus();
+  }, CONFIG.AUTO_FOCUS_DELAY);
 }
 
 //------------------------------------------------------------
-// タンクごとの計算
+// Enterキーで次の入力欄へ移動
+//------------------------------------------------------------
+function handleEnterKey(event, currentIdx, totalCount) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < totalCount) {
+      const nextInput = document.getElementById(`tankQty_${nextIdx}`);
+      if (nextInput) nextInput.focus();
+    }
+  }
+}
+
+//------------------------------------------------------------
+// タンクごとの計算（バリデーション強化）
 //------------------------------------------------------------
 function calculateTankTotal(idx) {
   const input = document.getElementById(`tankQty_${idx}`);
   const qty = Number(input.value) || 0;
+  const capacity = Number(input.dataset.tankCapacity);
   
   const calcDiv = document.getElementById(`calc_${idx}`);
+  
+  // バリデーション
+  if (qty < 0) {
+    input.value = 0;
+    alert("⚠️ 0以上の値を入力してください");
+    calcDiv.classList.remove('show');
+    return;
+  }
+  
+  if (qty > capacity) {
+    input.value = capacity;
+    alert(`⚠️ タンク容量（${capacity}L）を超えています\n\n容量まで自動調整しました`);
+  }
   
   if (qty <= 0) {
     calcDiv.classList.remove('show');
@@ -298,7 +401,7 @@ function calculateTankTotal(idx) {
 }
 
 //------------------------------------------------------------
-// JSON取り込み（マスタをDBに保存）
+// JSON取り込み（エラーハンドリング強化）
 //------------------------------------------------------------
 function importJSON() {
   const input = document.createElement('input');
@@ -314,47 +417,74 @@ function importJSON() {
     let tanksLoaded = false;
     let customersData = null;
     let tanksData = null;
+    const errors = [];
 
     for (const file of files) {
       try {
+        // ファイルサイズチェック（10MB以上は警告）
+        if (file.size > 10 * 1024 * 1024) {
+          errors.push(`${file.name}: ファイルサイズが大きすぎます（10MB以下にしてください）`);
+          continue;
+        }
+        
         const text = await file.text();
         const data = JSON.parse(text);
 
-        if (Array.isArray(data) && data.length > 0 && data[0]?.customerCode && data[0]?.officialName) {
+        // 配列チェック
+        if (!Array.isArray(data) || data.length === 0) {
+          errors.push(`${file.name}: 配列形式のJSONではありません`);
+          continue;
+        }
+
+        // customers.json判定
+        if (data[0]?.customerCode && data[0]?.officialName) {
           customersData = data;
           customersLoaded = true;
-          console.log("customers.json取り込み");
+          console.log("customers.json取り込み:", data.length, "件");
         }
-        else if (Array.isArray(data) && data.length > 0 && data[0]?.tankId) {
+        // tanks.json判定
+        else if (data[0]?.tankId && data[0]?.customerCode) {
           tanksData = data;
           tanksLoaded = true;
-          console.log("tanks.json取り込み");
+          console.log("tanks.json取り込み:", data.length, "件");
         }
         else {
-          alert(`${file.name}: JSON形式が不正です`);
+          errors.push(`${file.name}: 顧客またはタンクのJSONではありません\n必須フィールドを確認してください`);
         }
       } catch (err) {
         console.error(err);
-        alert(`${file.name}: JSON解析に失敗しました`);
+        errors.push(`${file.name}: ${err.message}`);
       }
+    }
+
+    // エラー表示
+    if (errors.length > 0) {
+      showError("JSONファイルの取り込みエラー", errors.join('\n\n'));
     }
 
     // DBに保存
     if (customersData) {
-      saveCustomersToDB(customersData);
+      await saveCustomersToDB(customersData);
     }
     
     if (tanksData) {
-      saveTanksToDB(tanksData);
+      await saveTanksToDB(tanksData);
+    }
+
+    // 成功時に取り込み日時を保存
+    if (customersLoaded || tanksLoaded) {
+      saveMasterImportDate();
     }
 
     // 結果通知
     if (customersLoaded && tanksLoaded) {
-      alert("✅ customers.json と tanks.json を取り込みました！\n\nマスタデータをデータベースに保存しました。\n次回起動時から自動的に読み込まれます。");
+      alert(`✅ 取り込み完了！\n\n顧客マスタ: ${customersData.length}件\nタンクマスタ: ${tanksData.length}件`);
     } else if (customersLoaded) {
-      alert("✅ customers.json を取り込みました\n\nマスタデータをデータベースに保存しました。");
+      alert(`✅ 顧客マスタを取り込みました\n\n${customersData.length}件のデータを登録しました`);
     } else if (tanksLoaded) {
-      alert("✅ tanks.json を取り込みました\n\nマスタデータをデータベースに保存しました。");
+      alert(`✅ タンクマスタを取り込みました\n\n${tanksData.length}件のデータを登録しました`);
+    } else if (errors.length === 0) {
+      alert("⚠️ 有効なJSONファイルが見つかりませんでした");
     }
   };
 
@@ -364,55 +494,86 @@ function importJSON() {
 }
 
 //------------------------------------------------------------
-// 顧客マスタをDBに保存
+// マスタ取り込み日時を保存
 //------------------------------------------------------------
-function saveCustomersToDB(data) {
-  const tx = db.transaction(["customers"], "readwrite");
-  const store = tx.objectStore("customers");
+function saveMasterImportDate() {
+  if (!db) return;
   
-  // 既存データをクリア
-  store.clear();
+  const tx = db.transaction(["metadata"], "readwrite");
+  const store = tx.objectStore("metadata");
   
-  // 新しいデータを保存
-  data.forEach(customer => {
-    const cleanData = {
-      customerCode: customer.customerCode,
-      officialName: customer.officialName,
-      officialKana: customer.officialKana || "",
-      unitPrice: customer.unitPrice || 0
-    };
-    store.put(cleanData);
+  store.put({
+    key: "masterImportDate",
+    value: new Date().toISOString()
   });
   
   tx.oncomplete = () => {
-    console.log("顧客マスタDB保存完了");
-    loadMastersFromDB();
+    displayMasterImportDate();
   };
+}
+
+//------------------------------------------------------------
+// 顧客マスタをDBに保存
+//------------------------------------------------------------
+function saveCustomersToDB(data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["customers"], "readwrite");
+    const store = tx.objectStore("customers");
+    
+    store.clear();
+    
+    data.forEach(customer => {
+      const cleanData = {
+        customerCode: customer.customerCode,
+        officialName: customer.officialName,
+        officialKana: customer.officialKana || "",
+        unitPrice: customer.unitPrice || 0
+      };
+      store.put(cleanData);
+    });
+    
+    tx.oncomplete = () => {
+      console.log("顧客マスタDB保存完了");
+      loadMastersFromDB();
+      resolve();
+    };
+    
+    tx.onerror = () => {
+      showError("顧客マスタの保存に失敗しました", "ブラウザのストレージ容量を確認してください");
+      reject();
+    };
+  });
 }
 
 //------------------------------------------------------------
 // タンクマスタをDBに保存
 //------------------------------------------------------------
 function saveTanksToDB(data) {
-  const tx = db.transaction(["tanks"], "readwrite");
-  const store = tx.objectStore("tanks");
-  
-  // 既存データをクリア
-  store.clear();
-  
-  // 新しいデータを保存
-  data.forEach(tank => {
-    store.put(tank);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["tanks"], "readwrite");
+    const store = tx.objectStore("tanks");
+    
+    store.clear();
+    
+    data.forEach(tank => {
+      store.put(tank);
+    });
+    
+    tx.oncomplete = () => {
+      console.log("タンクマスタDB保存完了");
+      loadMastersFromDB();
+      resolve();
+    };
+    
+    tx.onerror = () => {
+      showError("タンクマスタの保存に失敗しました", "ブラウザのストレージ容量を確認してください");
+      reject();
+    };
   });
-  
-  tx.oncomplete = () => {
-    console.log("タンクマスタDB保存完了");
-    loadMastersFromDB();
-  };
 }
 
 //------------------------------------------------------------
-// 給油データ保存（exported: false で保存）
+// 給油データ保存
 //------------------------------------------------------------
 function saveRecord() {
   const code = document.getElementById("customerSelect").value;
@@ -428,7 +589,6 @@ function saveRecord() {
   const custTanks = tanks.filter(t => t.customerCode === code);
   const recordsToSave = [];
 
-  // 保存するデータを収集
   custTanks.forEach((t, idx) => {
     const qtyInput = document.getElementById(`tankQty_${idx}`);
     const qty = Number(qtyInput.value);
@@ -459,8 +619,8 @@ function saveRecord() {
         amount,
         tax,
         total,
-        exported: false,        // 未出力
-        exportedDate: null      // 出力日時なし
+        exported: false,
+        exportedDate: null
       }
     });
   });
@@ -508,10 +668,16 @@ function saveRecord() {
         if (calcDiv) calcDiv.classList.remove('show');
       }
     });
+    
+    // 1つ目のタンクに再フォーカス
+    setTimeout(() => {
+      const firstInput = document.getElementById("tankQty_0");
+      if (firstInput) firstInput.focus();
+    }, 100);
   };
 
   tx.onerror = () => {
-    alert("❌ データ保存に失敗しました");
+    showError("給油データの保存に失敗しました", "ブラウザのストレージ容量を確認してください");
   };
 }
 
@@ -530,55 +696,7 @@ function getTimestamp() {
 }
 
 //------------------------------------------------------------
-// CSV出力（未出力データのみ）
-//------------------------------------------------------------
-function exportTodayCSV() {
-  const tx = db.transaction(["records"], "readonly");
-  const store = tx.objectStore("records");
-  const rows = [];
-
-  // 全データを取得して未出力をフィルタリング
-  store.openCursor().onsuccess = (e) => {
-    const cur = e.target.result;
-    if (cur) {
-      const record = cur.value;
-      // exportedフィールドがないか false のものだけ
-      if (!record.exported) {
-        rows.push(record);
-      }
-      cur.continue();
-    } else {
-      if (rows.length === 0) {
-        alert("⚠️ 未出力のデータがありません");
-        return;
-      }
-      
-      // 日付順にソート
-      rows.sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
-        return a.time.localeCompare(b.time);
-      });
-      
-      // 確認ダイアログ
-      const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
-      const totalAmount = rows.reduce((sum, r) => sum + r.total, 0);
-      
-      // 日付範囲を取得
-      const dates = [...new Set(rows.map(r => r.date))];
-      const dateRange = dates.length === 1 ? dates[0] : `${dates[0]} 〜 ${dates[dates.length - 1]}`;
-      
-      const confirmMsg = `CSV出力します。よろしいですか？\n\n【期間】${dateRange}\n【件数】${rows.length}件\n【合計】${totalQty}L / ¥${totalAmount.toLocaleString()}\n\n※出力後、データに出力済みフラグが立ちます\n※1ヶ月経過後に自動削除されます`;
-      
-      if (!confirm(confirmMsg)) return;
-      
-      makeCSV(rows);
-    }
-  };
-}
-
-//------------------------------------------------------------
-// CSV生成とダウンロード（出力済みフラグを立てる）
+// CSV生成とダウンロード
 //------------------------------------------------------------
 async function makeCSV(rows) {
   let csv = "得意先cd,得意先名,売上日,給油時刻,売上区分,数量,単価,金額,消費税,合計額,入金額,タンクID\n";
@@ -620,12 +738,11 @@ async function makeCSV(rows) {
       alert(`✅ ${filename} をダウンロードしました\n\n${rows.length}件のデータを出力しました\n\n💡 共有シートからiCloud Driveに保存できます`);
     }
     
-    // 出力済みフラグを立てる
     markAsExported(rows);
   } catch (e) {
     console.error(e);
     if (e.name !== 'AbortError') {
-      alert("❌ CSV保存に失敗しました");
+      showError("CSV保存に失敗しました", "ファイルシステムへのアクセスが拒否されました");
     }
   }
 }
@@ -653,6 +770,87 @@ function markAsExported(rows) {
   tx.oncomplete = () => {
     console.log(`${rows.length}件のデータに出力済みフラグを立てました`);
   };
+  
+  tx.onerror = () => {
+    console.error("出力済みフラグ設定に失敗");
+  };
+}
+
+//------------------------------------------------------------
+// オンライン/オフライン状態管理
+//------------------------------------------------------------
+function updateOnlineStatus() {
+  const isOnline = navigator.onLine;
+  const csvButton = document.querySelector('button[onclick="exportTodayCSV()"]');
+  
+  if (csvButton) {
+    if (isOnline) {
+      csvButton.disabled = false;
+      csvButton.style.opacity = '1';
+      csvButton.innerHTML = '📊 CSV出力';
+    } else {
+      csvButton.disabled = true;
+      csvButton.style.opacity = '0.5';
+      csvButton.innerHTML = '🚫 CSV出力（オフライン）';
+    }
+  }
+  
+  console.log(`ネットワーク状態: ${isOnline ? 'オンライン' : 'オフライン'}`);
+}
+
+//------------------------------------------------------------
+// CSV出力（オンラインチェック追加）
+//------------------------------------------------------------
+function exportTodayCSV() {
+  // オフラインチェック
+  if (!navigator.onLine) {
+    alert("⚠️ オフラインのためCSV出力できません\n\nオンラインになってから再度試してください。\nデータは保存されています。");
+    return;
+  }
+  
+  const tx = db.transaction(["records"], "readonly");
+  const store = tx.objectStore("records");
+  const rows = [];
+
+  store.openCursor().onsuccess = (e) => {
+    const cur = e.target.result;
+    if (cur) {
+      const record = cur.value;
+      if (!record.exported) {
+        rows.push(record);
+      }
+      cur.continue();
+    } else {
+      if (rows.length === 0) {
+        alert("⚠️ 未出力のデータがありません");
+        return;
+      }
+      
+      // 日付順にソート
+      rows.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.time.localeCompare(b.time);
+      });
+      
+      // 確認ダイアログ
+      const totalQty = rows.reduce((sum, r) => sum + r.qty, 0);
+      const totalAmount = rows.reduce((sum, r) => sum + r.total, 0);
+      
+      const dates = [...new Set(rows.map(r => r.date))];
+      const dateRange = dates.length === 1 ? dates[0] : `${dates[0]} 〜 ${dates[dates.length - 1]}`;
+      
+      const confirmMsg = `CSV出力します。よろしいですか？\n\n【期間】${dateRange}\n【件数】${rows.length}件\n【合計】${totalQty}L / ¥${totalAmount.toLocaleString()}\n\n※出力後、データに出力済みフラグが立ちます\n※${CONFIG.DATA_RETENTION_DAYS}日経過後に自動削除されます`;
+      
+      if (!confirm(confirmMsg)) return;
+      
+      makeCSV(rows);
+    }
+  };
+  
+  tx.onerror = () => {
+    showError("CSV出力に失敗しました", "ページを再読み込みしてください");
+  };
 }
 
 //------------------------------------------------------------
@@ -660,5 +858,11 @@ function markAsExported(rows) {
 //------------------------------------------------------------
 window.addEventListener("DOMContentLoaded", () => {
   initDB();
-  console.log("灯油配送管理システム v3.1 起動");
+  
+  // オンライン/オフライン状態の監視
+  updateOnlineStatus();
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  
+  console.log("灯油配送管理システム v3.2 起動");
 });
