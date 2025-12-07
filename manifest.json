@@ -1,0 +1,9 @@
+{
+  "name": "灯油配送入力システム",
+  "short_name": "灯油配送",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": []
+}

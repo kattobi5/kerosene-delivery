@@ -1,0 +1,68 @@
+[
+  {
+    "tankId": "1",
+    "customerCode": "1234",
+    "tankName": "牛舎１",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "2",
+    "customerCode": "1234",
+    "tankName": "牛舎２",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "3",
+    "customerCode": "1234",
+    "tankName": "牛舎３",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "4",
+    "customerCode": "2234",
+    "tankName": "搾乳舎",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "5",
+    "customerCode": "2234",
+    "tankName": "哺乳舎",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "6",
+    "customerCode": "2234",
+    "tankName": "経産牛舎",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "7",
+    "customerCode": "3234",
+    "tankName": "調乳室",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "8",
+    "customerCode": "3234",
+    "tankName": "従業員宿舎",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "9",
+    "customerCode": "3234",
+    "tankName": "事務所",
+    "tankCapacity": "480"
+  },
+  {
+    "tankId": "10",
+    "customerCode": "4234",
+    "tankName": "教室",
+    "tankCapacity": "1000"
+  },
+  {
+    "tankId": "11",
+    "customerCode": "4234",
+    "tankName": "お遊戯室",
+    "tankCapacity": "1000"
+  }
+]

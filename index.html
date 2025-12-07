@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灯油配送管理デモ</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    label { display: block; margin-top: 12px; }
+    select, input { padding: 4px; }
+    .tank-box { padding: 10px; border: 1px solid #ccc; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h2>顧客選択</h2>
+  <label>
+    顧客：
+    <select id="customerSelect" onchange="onCustomerChange()"></select>
+  </label>
+
+  <h2>タンク情報</h2>
+  <div id="tankContainer"></div>
+
+  <script>
+let customers = [];
+let tanks = [];
+
+async function loadCustomers() {
+  try {
+    const res = await fetch("customers.json");
+    customers = await res.json();
+    const select = document.getElementById("customerSelect");
+    select.innerHTML = "";
+    customers.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.customerCode;
+      opt.textContent = `${c.customerCode} : ${c.officialName}`;
+      select.appendChild(opt);
+    });
+  } catch(e) { console.error(e);} 
+}
+
+async function loadTanks() {
+  try {
+    const res = await fetch("tanks.json");
+    tanks = await res.json();
+  } catch(e) { console.error("タンク読み込み失敗", e);} 
+}
+
+function onCustomerChange() {
+  const code = document.getElementById("customerSelect").value;
+  const cust = customers.find(c => c.customerCode === code);
+
+  const container = document.getElementById("tankContainer");
+  container.innerHTML = "";
+  if (!cust) return;
+
+  const custTanks = tanks.filter(t => t.customerCode === code);
+
+  custTanks.forEach((t, idx) => {
+    const div = document.createElement("div");
+    div.className = "tank-box";
+    div.innerHTML = `
+      <div><b>タンク ${idx + 1}</b></div>
+      <div>名称：${t.tankName}</div>
+      <div>容量：${t.tankCapacity}</div>
+      <div>ID：${t.tankId}</div>
+      <div>
+        <label>給油量(L)：
+          <input type="number" id="tankQty_${idx}" min="0" />
+        </label>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+loadCustomers();
+loadTanks();
+
+let db;
+const req = indexedDB.open("oilDB", 1);
+req.onupgradeneeded = e => {
+  db = e.target.result;
+  if (!db.objectStoreNames.contains("records")) {
+    db.createObjectStore("records", { keyPath: "id", autoIncrement: true });
+  }
+};
+req.onsuccess = e => { db = e.target.result; };
+
+function saveRecord() {
+  const code = document.getElementById("customerSelect").value;
+  const cust = customers.find(c => c.customerCode === code);
+  if (!cust) return alert("顧客が選択されていません");
+
+  const custTanks = tanks.filter(t => t.customerCode === code);
+
+  const tx = db.transaction(["records"], "readwrite");
+  const store = tx.objectStore("records");
+  const now = new Date();
+
+  custTanks.forEach((t, idx) => {
+    const qty = Number(document.getElementById(`tankQty_${idx}`).value);
+    if (!qty) return;
+
+    const unit = cust.unitPrice || 0;
+    const amount = qty * unit;
+    const tax = Math.round(amount * 0.1);
+    const total = amount + tax;
+
+    store.put({
+      custCode: cust.customerCode,
+      custName: cust.officialName,
+      date: now.toLocaleDateString(),
+      time: now.toLocaleTimeString(),
+      tankId: t.tankId,
+      tankName: t.tankName,
+      qty, unitPrice: unit, amount, tax, total
+    });
+  });
+
+  alert("保存しました");
+}
+
+function exportTodayCSV() {
+  const today = new Date().toLocaleDateString();
+  const tx = db.transaction(["records"], "readonly");
+  const store = tx.objectStore("records");
+  const rows = [];
+
+  store.openCursor().onsuccess = e => {
+    const cur = e.target.result;
+    if (cur) {
+      if (cur.value.date === today) rows.push(cur.value);
+      cur.continue();
+    } else {
+      makeCSV(rows);
+      clearTodayData();
+    }
+  };
+}
+
+function makeCSV(rows) {
+  let csv = "得意先cd,得意先名,売上日,給油時刻,売上区分,数量,単価,金額,消費税,合計額,入金額,タンクID\n";
+
+  rows.forEach(r => {
+    csv += `${r.custCode},${r.custName},${r.date},${r.time},売掛,${r.qty},${r.unitPrice},${r.amount},${r.tax},${r.total},0,${r.tankId}
+`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "today_delivery.csv";
+  a.click();
+}
+
+function clearTodayData() {
+  const today = new Date().toLocaleDateString();
+  const tx = db.transaction(["records"], "readwrite");
+  const store = tx.objectStore("records");
+
+  store.openCursor().onsuccess = e => {
+    const cur = e.target.result;
+    if (cur) {
+      if (cur.value.date === today) store.delete(cur.key);
+      cur.continue();
+    }
+  };
+}
+</script>
+  <button onclick="saveRecord()">給油データ 保存</button>
+  <button onclick="exportTodayCSV()">本日のCSV出力</button>
+</body>
+</html>
