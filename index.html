@@ -213,6 +213,78 @@
       margin-bottom: 12px;
     }
 
+    /* 計算結果表示 */
+    .calculation-result {
+      margin-top: 12px;
+      padding: 12px;
+      background-color: var(--bg-card);
+      border-radius: 8px;
+      border-left: 4px solid var(--success-color);
+      display: none;
+    }
+
+    .calculation-result.show {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .calc-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .calc-label {
+      color: var(--text-secondary);
+    }
+
+    .calc-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .calc-total {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 2px solid var(--border-color);
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    /* 合計サマリー */
+    .summary-section {
+      background: linear-gradient(135deg, var(--success-color) 0%, var(--accent-color) 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+      display: none;
+    }
+
+    .summary-section.show {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .summary-title {
+      font-size: 16px;
+      opacity: 0.9;
+      margin-bottom: 8px;
+    }
+
+    .summary-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .summary-detail {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
     /* アクションボタングループ */
     .action-buttons {
       display: grid;
@@ -301,7 +373,6 @@
   <!-- ヘッダー -->
   <div class="header">
     <h1>🚛 灯油配送管理システム</h1>
-    <button onclick="importJSON()">📁 JSON取り込み</button>
   </div>
 
   <!-- 顧客選択セクション -->
@@ -332,7 +403,20 @@
     </div>
   </div>
 
+  <!-- データ管理セクション -->
+  <div class="section">
+    <h2>📚 データ管理</h2>
+    <div class="info-message">
+      💡 <strong>マスタ更新時</strong>：顧客・タンク情報が変更された場合はJSON取り込みで更新してください
+    </div>
+    <button onclick="importJSON()">📁 マスタデータ取り込み</button>
+    <button onclick="viewPastData()">📅 過去データ閲覧</button>
+    <button onclick="backupData()">💾 バックアップ</button>
+    <button onclick="restoreData()">🔄 復元</button>
+    <button class="danger" onclick="clearAllData()">🗑️ 全データ削除</button>
+  </div>
+
   <script src="app.js"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"9aa0f59e9cc3d797","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.9.1","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+  <script src="data-manager.js"></script>
 </body>
 </html>
