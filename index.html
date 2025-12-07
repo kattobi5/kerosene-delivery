@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>灯油配送管理デモ</title>
+  <title>灯油配送管理デモ（修正版）</title>
   <style>
     body { font-family: sans-serif; padding: 16px; }
     label { display: block; margin-top: 12px; }
@@ -22,32 +22,54 @@
   <h2>タンク情報</h2>
   <div id="tankContainer"></div>
 
-  <script>
+  <!-- 給油データ保存 & CSV出力 ボタン追加 -->
+  <div style="margin-top:20px;">
+    <button onclick="saveRecord()">給油データ保存</button>
+    <button onclick="exportTodayCSV()">CSV出力</button>
+  </div>
+
+<script>
+//------------------------------------------------------------
+// 顧客・タンクデータ
+//------------------------------------------------------------
 let customers = [];
 let tanks = [];
 
+//------------------------------------------------------------
+// 初期読み込み
+//------------------------------------------------------------
 async function loadCustomers() {
   try {
     const res = await fetch("customers.json");
     customers = await res.json();
-    const select = document.getElementById("customerSelect");
-    select.innerHTML = "";
-    customers.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.customerCode;
-      opt.textContent = `${c.customerCode} : ${c.officialName}`;
-      select.appendChild(opt);
-    });
-  } catch(e) { console.error(e);} 
+    populateCustomerSelect();
+  } catch (e) { console.error(e); }
 }
 
 async function loadTanks() {
   try {
     const res = await fetch("tanks.json");
     tanks = await res.json();
-  } catch(e) { console.error("タンク読み込み失敗", e);} 
+  } catch (e) { console.error(e); }
 }
 
+//------------------------------------------------------------
+// 顧客ドロップダウン更新
+//------------------------------------------------------------
+function populateCustomerSelect() {
+  const select = document.getElementById("customerSelect");
+  select.innerHTML = "";
+  customers.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.customerCode;
+    opt.textContent = `${c.customerCode} : ${c.officialName}`;
+    select.appendChild(opt);
+  });
+}
+
+//------------------------------------------------------------
+// 顧客選択 → タンク一覧更新
+//------------------------------------------------------------
 function onCustomerChange() {
   const code = document.getElementById("customerSelect").value;
   const cust = customers.find(c => c.customerCode === code);
@@ -66,22 +88,59 @@ function onCustomerChange() {
       <div>名称：${t.tankName}</div>
       <div>容量：${t.tankCapacity}</div>
       <div>ID：${t.tankId}</div>
-      <div>
-        <label>給油量(L)：
-          <input type="number" id="tankQty_${idx}" min="0" />
-        </label>
-      </div>
+      <label>給油量(L)：<input type="number" id="tankQty_${idx}" min="0"></label>
     `;
     container.appendChild(div);
   });
 }
 
-loadCustomers();
-loadTanks();
-loadTanks();
+//------------------------------------------------------------
+// JSON取り込み（customers.json / tanks.json 自動判定）
+//------------------------------------------------------------
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
 
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (Array.isArray(data) && data[0]?.customerCode) {
+        customers = data;
+        populateCustomerSelect();
+        alert('customers.json を取り込みました');
+        if (tanks.length > 0) alert('取り込み完了！（customers + tanks）');
+      }
+      else if (Array.isArray(data) && data[0]?.tankId) {
+        tanks = data;
+        alert('tanks.json を取り込みました');
+        if (customers.length > 0) alert('取り込み完了！（customers + tanks）');
+      }
+      else {
+        alert('JSON形式が不正です');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('JSON解析に失敗しました');
+    }
+  };
+
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(() => document.body.removeChild(input), 500);
+}
+
+//------------------------------------------------------------
+// IndexedDB
+//------------------------------------------------------------
 let db;
 const req = indexedDB.open("oilDB", 1);
+
 req.onupgradeneeded = e => {
   db = e.target.result;
   if (!db.objectStoreNames.contains("records")) {
@@ -90,6 +149,9 @@ req.onupgradeneeded = e => {
 };
 req.onsuccess = e => { db = e.target.result; };
 
+//------------------------------------------------------------
+// 給油データ保存
+//------------------------------------------------------------
 function saveRecord() {
   const code = document.getElementById("customerSelect").value;
   const cust = customers.find(c => c.customerCode === code);
@@ -124,44 +186,9 @@ function saveRecord() {
   alert("保存しました");
 }
 
-function importJSON() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const text = await file.text();
-    try {
-      const data = JSON.parse(text);
-      if (Array.isArray(data) && data[0]?.customerCode) {
-        customers = data;
-        populateCustomerSelectFromImport();
-        alert('customers.json を取り込みました');
-      } else if (Array.isArray(data) && data[0]?.tankId) {
-        tanks = data;
-        alert('tanks.json を取り込みました');
-      } else {
-        alert('不正なJSONファイルです');
-      }
-    } catch(err) {
-      alert('JSON解析に失敗しました');
-    }
-  };
-  input.click();
-}
-
-function populateCustomerSelectFromImport() {
-  const select = document.getElementById('customerSelect');
-  select.innerHTML = '';
-  customers.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.customerCode;
-    opt.textContent = `${c.customerCode} : ${c.officialName}`;
-    select.appendChild(opt);
-  });
-}
-
+//------------------------------------------------------------
+// CSV出力（iCloud Drive 保存対応）
+//------------------------------------------------------------
 function exportTodayCSV() {
   const today = new Date().toLocaleDateString();
   const tx = db.transaction(["records"], "readonly");
@@ -180,7 +207,7 @@ function exportTodayCSV() {
   };
 }
 
-function makeCSV(rows) {
+async function makeCSV(rows) {
   let csv = "得意先cd,得意先名,売上日,給油時刻,売上区分,数量,単価,金額,消費税,合計額,入金額,タンクID\n";
 
   rows.forEach(r => {
@@ -188,38 +215,52 @@ function makeCSV(rows) {
 `;
   });
 
-  // iCloud Drive など任意フォルダに保存
-  (async () => {
-    try {
+  try {
+    // Safari は showSaveFilePicker が実装されていても挙動が不安定なので強制的に除外
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    if (window.showSaveFilePicker && !isSafari) {
       const handle = await window.showSaveFilePicker({
-        suggestedName: "today_delivery.csv",
-        types: [{
-          description: "CSV File",
-          accept: { "text/csv": [".csv"] }
-        }]
+        suggestedName: `today_delivery_${getTimestamp()}.csv`,
+        types: [{ description: "CSV File", accept: { "text/csv": [".csv"] } }],
+        excludeAcceptAllOption: false,
+        startIn: "documents"
       });
 
       const writable = await handle.createWritable();
       await writable.write(new Blob([csv], { type: "text/csv" }));
       await writable.close();
-      alert("ファイルを保存しました（iCloud Drive も選択可能）");
-    } catch (e) {
-      console.error(e);
-      alert("保存がキャンセルされました");
+      alert("ファイルを保存しました（iCloud Drive OK）");
+    } else {
+      function getTimestamp() {
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const DD = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yy}${MM}${DD}${hh}${mm}${ss}`;
+}
+
+// Safari/iPadOS 用：ダウンロード→共有シート→iCloud Drive 保存が可能
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `today_delivery_${getTimestamp()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert("CSVをダウンロードしました（共有シートからiCloud保存）");
     }
-  })();
+  } catch (e) {
+    console.error(e);
+    alert("保存がキャンセルされました");
+  }
 }
-`;
-  });
-
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "today_delivery.csv";
-  a.click();
-}
-
+//------------------------------------------------------------
+// 今日のデータ削除
+//------------------------------------------------------------
 function clearTodayData() {
   const today = new Date().toLocaleDateString();
   const tx = db.transaction(["records"], "readwrite");
@@ -228,13 +269,17 @@ function clearTodayData() {
   store.openCursor().onsuccess = e => {
     const cur = e.target.result;
     if (cur) {
-      if (cur.value.date === today) store.delete(cur.key);
+      if (cur.value.date === today) cur.delete();
       cur.continue();
     }
   };
 }
+// ページロード時に customers.json と tanks.json を読む
+window.addEventListener("DOMContentLoaded", () => {
+  loadCustomers();
+  loadTanks();
+});
+
 </script>
-  <button onclick="saveRecord()">給油データ 保存</button>
-  <button onclick="exportTodayCSV()">本日のCSV出力</button>
 </body>
 </html>
