@@ -282,7 +282,14 @@ function onCustomerChange() {
   currentCustomer = customers.find(c => c.customerCode === code);
   if (!currentCustomer) return;
 
-  const custTanks = tanks.filter(t => t.customerCode === code);
+  const custTanks = tanks
+    .filter(t => t.customerCode === code)
+    .sort((a, b) => {
+      // tankIdを数値として比較（文字列の場合は数値に変換）
+      const idA = parseInt(a.tankId, 10);
+      const idB = parseInt(b.tankId, 10);
+      return idA - idB;
+    });
 
   if (custTanks.length === 0) {
     container.innerHTML = `
@@ -626,7 +633,14 @@ function saveRecord() {
   const cust = customers.find(c => c.customerCode === code);
   if (!cust) return;
 
-  const custTanks = tanks.filter(t => t.customerCode === code);
+  const custTanks = tanks
+    .filter(t => t.customerCode === code)
+    .sort((a, b) => {
+      // tankIdを数値として比較
+      const idA = parseInt(a.tankId, 10);
+      const idB = parseInt(b.tankId, 10);
+      return idA - idB;
+    });
   const recordsToSave = [];
 
   custTanks.forEach((t, idx) => {

@@ -65,6 +65,27 @@
       font-size: 24px;
       margin-bottom: 16px;
       color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .version-badge {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent-color);
+      background-color: rgba(52, 152, 219, 0.1);
+      padding: 4px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--accent-color);
+      letter-spacing: 0.5px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .version-badge {
+        background-color: rgba(52, 152, 219, 0.15);
+      }
     }
 
     /* セクション */
@@ -335,6 +356,11 @@
         font-size: 28px;
       }
 
+      .version-badge {
+        font-size: 13px;
+        padding: 5px 12px;
+      }
+
       .section h2 {
         font-size: 22px;
       }
@@ -372,7 +398,10 @@
 <body>
   <!-- ヘッダー -->
   <div class="header">
-    <h1>🚛 灯油配送管理システム</h1>
+    <h1>
+      🚛 灯油配送管理システム
+      <span class="version-badge">v3.3.2</span>
+    </h1>
   </div>
 
   <!-- 顧客選択セクション -->
