@@ -314,16 +314,15 @@ function onCustomerChange() {
         </div>
         <div class="tank-capacity">容量: ${t.tankCapacity}L</div>
       </div>
-      <label for="tankQty_${idx}">給油量 (L)</label>
+      <label for="tankQty_${idx}">メーター値 (L) - ローリーの累積表示を入力</label>
       <input 
         type="number" 
         id="tankQty_${idx}" 
         data-tank-idx="${idx}"
         data-tank-capacity="${t.tankCapacity}"
         min="0" 
-        max="${t.tankCapacity}"
         step="1"
-        placeholder="0"
+        placeholder="例: ${idx === 0 ? '100' : '250'}"
         inputmode="decimal"
         oninput="calculateTankTotal(${idx})"
         onkeypress="handleEnterKey(event, ${idx}, ${custTanks.length})"
@@ -331,9 +330,13 @@ function onCustomerChange() {
       
       <!-- 計算結果表示 -->
       <div class="calculation-result" id="calc_${idx}">
+        <div class="calc-row" style="background-color: var(--bg-secondary); padding: 8px; border-radius: 4px; margin-bottom: 8px;">
+          <span class="calc-label">→ この給油量:</span>
+          <span class="calc-value" id="calc_qty_${idx}" style="font-weight: bold; color: var(--accent-color);">0 L</span>
+        </div>
         <div class="calc-row">
           <span class="calc-label">数量:</span>
-          <span class="calc-value" id="calc_qty_${idx}">0 L</span>
+          <span class="calc-value" id="calc_qty_display_${idx}">0 L</span>
         </div>
         <div class="calc-row">
           <span class="calc-label">単価:</span>
@@ -380,45 +383,49 @@ function handleEnterKey(event, currentIdx, totalCount) {
 //------------------------------------------------------------
 // タンクごとの計算（バリデーション強化）
 //------------------------------------------------------------
+//------------------------------------------------------------
+// タンク別計算（累積メーター値対応）
+//------------------------------------------------------------
 function calculateTankTotal(idx) {
   const input = document.getElementById(`tankQty_${idx}`);
-  const qty = Number(input.value) || 0;
-  const capacity = Number(input.dataset.tankCapacity);
-  
+  const meterValue = Number(input.value) || 0;
   const calcDiv = document.getElementById(`calc_${idx}`);
-  
-  // バリデーション
-  if (qty < 0) {
+  if (meterValue < 0) {
     input.value = 0;
     alert("⚠️ 0以上の値を入力してください");
     calcDiv.classList.remove('show');
     return;
   }
-  
-  if (qty > capacity) {
-    input.value = capacity;
-    alert(`⚠️ タンク容量（${capacity}L）を超えています\n\n容量まで自動調整しました`);
+  let prevMeterValue = 0;
+  if (idx > 0) {
+    const prevInput = document.getElementById(`tankQty_${idx - 1}`);
+    prevMeterValue = Number(prevInput.value) || 0;
+    if (meterValue < prevMeterValue) {
+      alert(`⚠️ メーター値が前のタンク（${prevMeterValue}L）より小さいです\n\n累積値を入力してください`);
+      calcDiv.classList.remove('show');
+      return;
+    }
   }
-  
-  if (qty <= 0) {
+  const actualQty = meterValue - prevMeterValue;
+  if (actualQty <= 0) {
     calcDiv.classList.remove('show');
     return;
   }
-  
   if (!currentCustomer) return;
-  
   const unit = currentCustomer.unitPrice || 0;
-  const amount = qty * unit;
+  const amount = actualQty * unit;
   const tax = Math.round(amount * 0.1);
   const total = amount + tax;
-  
-  // 表示更新
-  document.getElementById(`calc_qty_${idx}`).textContent = `${qty} L`;
+  document.getElementById(`calc_qty_${idx}`).textContent = `${actualQty} L`;
+  document.getElementById(`calc_qty_display_${idx}`).textContent = `${actualQty} L`;
   document.getElementById(`calc_amount_${idx}`).textContent = `¥${amount.toLocaleString()}`;
   document.getElementById(`calc_tax_${idx}`).textContent = `¥${tax.toLocaleString()}`;
   document.getElementById(`calc_total_${idx}`).textContent = `¥${total.toLocaleString()}`;
-  
   calcDiv.classList.add('show');
+  const nextInput = document.getElementById(`tankQty_${idx + 1}`);
+  if (nextInput && nextInput.value) {
+    calculateTankTotal(idx + 1);
+  }
 }
 
 //------------------------------------------------------------
@@ -645,9 +652,21 @@ function saveRecord() {
 
   custTanks.forEach((t, idx) => {
     const qtyInput = document.getElementById(`tankQty_${idx}`);
-    const qty = Number(qtyInput.value);
+    const meterValue = Number(qtyInput.value);
     
-    if (!qty || qty <= 0) return;
+    if (!meterValue || meterValue <= 0) return;
+
+    // 前のタンクのメーター値を取得
+    let prevMeterValue = 0;
+    if (idx > 0) {
+      const prevInput = document.getElementById(`tankQty_${idx - 1}`);
+      prevMeterValue = Number(prevInput.value) || 0;
+    }
+    
+    // 実際の給油量を計算
+    const qty = meterValue - prevMeterValue;
+    
+    if (qty <= 0) return;
 
     const unit = cust.unitPrice || 0;
     const amount = qty * unit;
