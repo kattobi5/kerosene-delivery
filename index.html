@@ -2,284 +2,337 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>灯油配送管理デモ（修正版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>灯油配送管理システム</title>
   <style>
-    body { font-family: sans-serif; padding: 16px; }
-    label { display: block; margin-top: 12px; }
-    select, input { padding: 4px; }
-    .tank-box { padding: 10px; border: 1px solid #ccc; margin-top: 8px; }
+    /* カラー変数定義 */
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-card: #ffffff;
+      --text-primary: #333333;
+      --text-secondary: #666666;
+      --border-color: #dddddd;
+      --accent-color: #007bff;
+      --accent-hover: #0056b3;
+      --success-color: #28a745;
+      --danger-color: #dc3545;
+      --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* ダークモード */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #2d2d2d;
+        --bg-card: #2d2d2d;
+        --text-primary: #e0e0e0;
+        --text-secondary: #b0b0b0;
+        --border-color: #444444;
+        --accent-color: #4a9eff;
+        --accent-hover: #357abd;
+        --success-color: #34c759;
+        --danger-color: #ff3b30;
+        --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      padding: 16px;
+      line-height: 1.6;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* ヘッダー */
+    .header {
+      background-color: var(--bg-card);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    /* セクション */
+    .section {
+      background-color: var(--bg-card);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .section h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 8px;
+    }
+
+    /* ボタン */
+    button {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.1s;
+      box-shadow: var(--shadow);
+      min-height: 52px;
+      width: 100%;
+      margin-bottom: 12px;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      background-color: var(--accent-hover);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button.success {
+      background-color: var(--success-color);
+    }
+
+    button.danger {
+      background-color: var(--danger-color);
+    }
+
+    /* ラベル */
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* セレクトボックス */
+    select {
+      width: 100%;
+      padding: 16px;
+      font-size: 18px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      min-height: 52px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      padding-right: 40px;
+      transition: border-color 0.3s;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+
+    /* 入力フィールド */
+    input[type="number"] {
+      width: 100%;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: 600;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      min-height: 60px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent-color);
+      background-color: var(--bg-card);
+    }
+
+    /* タンクボックス */
+    .tank-box {
+      background-color: var(--bg-secondary);
+      padding: 20px;
+      border: 2px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .tank-box:hover {
+      border-color: var(--accent-color);
+    }
+
+    .tank-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tank-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .tank-capacity {
+      font-size: 14px;
+      color: var(--text-secondary);
+      background-color: var(--bg-card);
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+
+    .tank-info {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* アクションボタングループ */
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 空状態 */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    /* インフォメッセージ */
+    .info-message {
+      background-color: var(--bg-secondary);
+      border-left: 4px solid var(--accent-color);
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* レスポンシブ対応 */
+    @media (min-width: 768px) {
+      body {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .header h1 {
+        font-size: 28px;
+      }
+
+      .section h2 {
+        font-size: 22px;
+      }
+    }
+
+    /* タッチ操作の改善 */
+    @media (hover: none) and (pointer: coarse) {
+      button {
+        padding: 18px 24px;
+        min-height: 56px;
+      }
+
+      select, input[type="number"] {
+        min-height: 56px;
+      }
+    }
+
+    /* アニメーション */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .tank-box {
+      animation: fadeIn 0.3s ease-out;
+    }
   </style>
 </head>
 <body>
-  <h2>顧客選択</h2>
-  <button onclick="importJSON()">JSON取り込み</button>
-  <label>
-    顧客：
-    <select id="customerSelect" onchange="onCustomerChange()"></select>
-  </label>
-
-  <h2>タンク情報</h2>
-  <div id="tankContainer"></div>
-
-  <!-- 給油データ保存 & CSV出力 ボタン追加 -->
-  <div style="margin-top:20px;">
-    <button onclick="saveRecord()">給油データ保存</button>
-    <button onclick="exportTodayCSV()">CSV出力</button>
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>🚛 灯油配送管理システム</h1>
+    <button onclick="importJSON()">📁 JSON取り込み</button>
   </div>
 
-<script>
-//------------------------------------------------------------
-// 顧客・タンクデータ
-//------------------------------------------------------------
-let customers = [];
-let tanks = [];
+  <!-- 顧客選択セクション -->
+  <div class="section">
+    <h2>顧客選択</h2>
+    <label for="customerSelect">配送先を選択してください</label>
+    <select id="customerSelect" onchange="onCustomerChange()">
+      <option value="">-- 顧客を選択 --</option>
+    </select>
+  </div>
 
-//------------------------------------------------------------
-// 初期読み込み
-//------------------------------------------------------------
-async function loadCustomers() {
-  try {
-    const res = await fetch("customers.json");
-    customers = await res.json();
-    populateCustomerSelect();
-  } catch (e) { console.error(e); }
-}
+  <!-- タンク情報セクション -->
+  <div class="section">
+    <h2>タンク情報</h2>
+    <div id="tankContainer">
+      <div class="empty-state">
+        <div class="empty-state-icon">⛽</div>
+        <p>顧客を選択すると、タンク情報が表示されます</p>
+      </div>
+    </div>
+  </div>
 
-async function loadTanks() {
-  try {
-    const res = await fetch("tanks.json");
-    tanks = await res.json();
-  } catch (e) { console.error(e); }
-}
+  <!-- アクションボタン -->
+  <div class="section">
+    <div class="action-buttons">
+      <button class="success" onclick="saveRecord()">💾 給油データ保存</button>
+      <button onclick="exportTodayCSV()">📊 CSV出力</button>
+    </div>
+  </div>
 
-//------------------------------------------------------------
-// 顧客ドロップダウン更新
-//------------------------------------------------------------
-function populateCustomerSelect() {
-  const select = document.getElementById("customerSelect");
-  select.innerHTML = "";
-  customers.forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c.customerCode;
-    opt.textContent = `${c.customerCode} : ${c.officialName}`;
-    select.appendChild(opt);
-  });
-}
-
-//------------------------------------------------------------
-// 顧客選択 → タンク一覧更新
-//------------------------------------------------------------
-function onCustomerChange() {
-  const code = document.getElementById("customerSelect").value;
-  const cust = customers.find(c => c.customerCode === code);
-
-  const container = document.getElementById("tankContainer");
-  container.innerHTML = "";
-  if (!cust) return;
-
-  const custTanks = tanks.filter(t => t.customerCode === code);
-
-  custTanks.forEach((t, idx) => {
-    const div = document.createElement("div");
-    div.className = "tank-box";
-    div.innerHTML = `
-      <div><b>タンク ${idx + 1}</b></div>
-      <div>名称：${t.tankName}</div>
-      <div>容量：${t.tankCapacity}</div>
-      <div>ID：${t.tankId}</div>
-      <label>給油量(L)：<input type="number" id="tankQty_${idx}" min="0"></label>
-    `;
-    container.appendChild(div);
-  });
-}
-
-//------------------------------------------------------------
-// JSON取り込み（customers.json / tanks.json 自動判定）
-//------------------------------------------------------------
-function importJSON() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'application/json,.json';
-
-  input.onchange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (Array.isArray(data) && data[0]?.customerCode) {
-        customers = data;
-        populateCustomerSelect();
-        alert('customers.json を取り込みました');
-        if (tanks.length > 0) alert('取り込み完了！（customers + tanks）');
-      }
-      else if (Array.isArray(data) && data[0]?.tankId) {
-        tanks = data;
-        alert('tanks.json を取り込みました');
-        if (customers.length > 0) alert('取り込み完了！（customers + tanks）');
-      }
-      else {
-        alert('JSON形式が不正です');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('JSON解析に失敗しました');
-    }
-  };
-
-  document.body.appendChild(input);
-  input.click();
-  setTimeout(() => document.body.removeChild(input), 500);
-}
-
-//------------------------------------------------------------
-// IndexedDB
-//------------------------------------------------------------
-let db;
-const req = indexedDB.open("oilDB", 1);
-
-req.onupgradeneeded = e => {
-  db = e.target.result;
-  if (!db.objectStoreNames.contains("records")) {
-    db.createObjectStore("records", { keyPath: "id", autoIncrement: true });
-  }
-};
-req.onsuccess = e => { db = e.target.result; };
-
-//------------------------------------------------------------
-// 給油データ保存
-//------------------------------------------------------------
-function saveRecord() {
-  const code = document.getElementById("customerSelect").value;
-  const cust = customers.find(c => c.customerCode === code);
-  if (!cust) return alert("顧客が選択されていません");
-
-  const custTanks = tanks.filter(t => t.customerCode === code);
-
-  const tx = db.transaction(["records"], "readwrite");
-  const store = tx.objectStore("records");
-  const now = new Date();
-
-  custTanks.forEach((t, idx) => {
-    const qty = Number(document.getElementById(`tankQty_${idx}`).value);
-    if (!qty) return;
-
-    const unit = cust.unitPrice || 0;
-    const amount = qty * unit;
-    const tax = Math.round(amount * 0.1);
-    const total = amount + tax;
-
-    store.put({
-      custCode: cust.customerCode,
-      custName: cust.officialName,
-      date: now.toLocaleDateString(),
-      time: now.toLocaleTimeString(),
-      tankId: t.tankId,
-      tankName: t.tankName,
-      qty, unitPrice: unit, amount, tax, total
-    });
-  });
-
-  alert("保存しました");
-}
-
-//------------------------------------------------------------
-// CSV出力（iCloud Drive 保存対応）
-//------------------------------------------------------------
-function exportTodayCSV() {
-  const today = new Date().toLocaleDateString();
-  const tx = db.transaction(["records"], "readonly");
-  const store = tx.objectStore("records");
-  const rows = [];
-
-  store.openCursor().onsuccess = e => {
-    const cur = e.target.result;
-    if (cur) {
-      if (cur.value.date === today) rows.push(cur.value);
-      cur.continue();
-    } else {
-      makeCSV(rows);
-      clearTodayData();
-    }
-  };
-}
-
-async function makeCSV(rows) {
-  let csv = "得意先cd,得意先名,売上日,給油時刻,売上区分,数量,単価,金額,消費税,合計額,入金額,タンクID\n";
-
-  rows.forEach(r => {
-    csv += `${r.custCode},${r.custName},${r.date},${r.time},売掛,${r.qty},${r.unitPrice},${r.amount},${r.tax},${r.total},0,${r.tankId}
-`;
-  });
-
-  try {
-    // Safari は showSaveFilePicker が実装されていても挙動が不安定なので強制的に除外
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-    if (window.showSaveFilePicker && !isSafari) {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `today_delivery_${getTimestamp()}.csv`,
-        types: [{ description: "CSV File", accept: { "text/csv": [".csv"] } }],
-        excludeAcceptAllOption: false,
-        startIn: "documents"
-      });
-
-      const writable = await handle.createWritable();
-      await writable.write(new Blob([csv], { type: "text/csv" }));
-      await writable.close();
-      alert("ファイルを保存しました（iCloud Drive OK）");
-    } else {
-      function getTimestamp() {
-  const d = new Date();
-  const yy = String(d.getFullYear()).slice(-2);
-  const MM = String(d.getMonth() + 1).padStart(2, '0');
-  const DD = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  return `${yy}${MM}${DD}${hh}${mm}${ss}`;
-}
-
-// Safari/iPadOS 用：ダウンロード→共有シート→iCloud Drive 保存が可能
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `today_delivery_${getTimestamp()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      alert("CSVをダウンロードしました（共有シートからiCloud保存）");
-    }
-  } catch (e) {
-    console.error(e);
-    alert("保存がキャンセルされました");
-  }
-}
-//------------------------------------------------------------
-// 今日のデータ削除
-//------------------------------------------------------------
-function clearTodayData() {
-  const today = new Date().toLocaleDateString();
-  const tx = db.transaction(["records"], "readwrite");
-  const store = tx.objectStore("records");
-
-  store.openCursor().onsuccess = e => {
-    const cur = e.target.result;
-    if (cur) {
-      if (cur.value.date === today) cur.delete();
-      cur.continue();
-    }
-  };
-}
-// ページロード時に customers.json と tanks.json を読む
-window.addEventListener("DOMContentLoaded", () => {
-  loadCustomers();
-  loadTanks();
-});
-
-</script>
+  <script src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"9aa0f59e9cc3d797","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.9.1","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
 </body>
 </html>

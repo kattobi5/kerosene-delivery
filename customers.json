@@ -2,40 +2,21 @@
   {
     "customerCode": "1234",
     "officialName": "かっとびファーム",
-    "unitPrice": 100,
-    "tanks": [
-      "牛舎１",
-      "牛舎２",
-      "牛舎３"
-    ]
+    "unitPrice": 100
   },
   {
     "customerCode": "2234",
     "officialName": "かっとび農場",
-    "unitPrice": 98,
-    "tanks": [
-      "搾乳舎",
-      "哺乳舎",
-      "経産牛舎"
-    ]
+    "unitPrice": 98
   },
   {
     "customerCode": "3234",
     "officialName": "かっとび農園",
-    "unitPrice": 102,
-    "tanks": [
-      "調乳室",
-      "従業員宿舎",
-      "事務所"
-    ]
+    "unitPrice": 102
   },
   {
     "customerCode": "4234",
     "officialName": "かっとび幼稚園",
-    "unitPrice": 102,
-    "tanks": [
-      "教室",
-      "お遊戯室"
-    ]
+    "unitPrice": 102
   }
 ]
