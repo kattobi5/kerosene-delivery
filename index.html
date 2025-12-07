@@ -13,6 +13,7 @@
 </head>
 <body>
   <h2>顧客選択</h2>
+  <button onclick="importJSON()">JSON取り込み</button>
   <label>
     顧客：
     <select id="customerSelect" onchange="onCustomerChange()"></select>
@@ -77,6 +78,7 @@ function onCustomerChange() {
 
 loadCustomers();
 loadTanks();
+loadTanks();
 
 let db;
 const req = indexedDB.open("oilDB", 1);
@@ -120,6 +122,44 @@ function saveRecord() {
   });
 
   alert("保存しました");
+}
+
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const data = JSON.parse(text);
+      if (Array.isArray(data) && data[0]?.customerCode) {
+        customers = data;
+        populateCustomerSelectFromImport();
+        alert('customers.json を取り込みました');
+      } else if (Array.isArray(data) && data[0]?.tankId) {
+        tanks = data;
+        alert('tanks.json を取り込みました');
+      } else {
+        alert('不正なJSONファイルです');
+      }
+    } catch(err) {
+      alert('JSON解析に失敗しました');
+    }
+  };
+  input.click();
+}
+
+function populateCustomerSelectFromImport() {
+  const select = document.getElementById('customerSelect');
+  select.innerHTML = '';
+  customers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.customerCode;
+    opt.textContent = `${c.customerCode} : ${c.officialName}`;
+    select.appendChild(opt);
+  });
 }
 
 function exportTodayCSV() {
